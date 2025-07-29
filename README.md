@@ -7,6 +7,6 @@ Folder Gompertz-Mortality-Model contains two R-language files: "Functions.R" and
 
 To reproduce simulation results from the Gompertz Mortality Model, run "Simulations.R", which will source "Functions.R" from this repository. Make sure to add a valid local address to line 7 for saving simulation results. The output will be an RDS file named results.RDS, saved into the folder whose address was specified on line 7.
 
-Folder Health-Points-Model contains ...
+Folder Health-Points-Model contains a makefile that controls series of python files running the health points simulation.
 
-To reproduce simulation results from the Health Points Model, ...
+To reproduce simulation results from the Health Points Model, simply run the makefile with the command 'make' or tune experiment parameters by updating the makefile using the instructions contained within
