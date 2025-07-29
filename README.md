@@ -9,4 +9,4 @@ To reproduce simulation results from the Gompertz Mortality Model, run "Simulati
 
 Folder Health-Points-Model contains a makefile that controls series of python files running the health points simulation.
 
-To reproduce simulation results from the Health Points Model, simply run the makefile with the command 'make' or tune experiment parameters by updating the makefile using the instructions contained within
+To reproduce simulation results from the Health Points Model, simply run the makefile with the command 'make' or tune experiment parameters by updating the makefile using the instructions contained within. Outputs will be saved to the folders labeled 'config_files', 'csv', 'data', and 'graphs'.
