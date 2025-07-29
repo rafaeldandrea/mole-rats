@@ -13,6 +13,10 @@ INIT_POP = 104 # Only if SET_INIT_POP_TO_EQUILIBRIUM = False will this be used
 DATA_COMBINATIONS ?=  wR9r10HP1000hp900pcE1.1pcM0.07BP0.3TTF3IRT2 wR10r9HP900hp1000pcE1.1pcM0.07BP0.3TTF3IRT2 # #wR9r10HP1000hp900pcE1.1pcM0.07BP0.3TTF3 #LS4wR10r9HP900hp1000 #HP290pcE2IdT3BP.9 #HP1200hp1000 HP1500hp1000 # R.72r.7 R.73r.7 R.71r.7 R5.5r5 R6r5 R7r5 HP1100hp1000 #WA-T7-HP1000hp1200R6r5 #T7-R6r5 #B2-R6r5 #B2-R6r5 T6-HP1200hp1000 #T6-HP1200hp1000R6r5 T6-R6r5  #T7-R6r5 #T5-R6r5 T6-R6r5 # B2-R6r5 #T4-R6r5 T3-R6r5  
 MAX_TICKS = 5001
 
+# Default target
+default: GetInitialDistributionData runSim 
+	# make GetPopAFraction 
+
 # REPRODUCTION_TYPE=Lin
 # Ex. R10r9
 # This will eiter create or use a config file with the default configuration
@@ -64,12 +68,6 @@ MAX_TICKS = 5001
 USE_AVG_POP_SIZE_FOR_LOG_CAP = False
 # REPRODUCTION_TYPE ?=BasicLin
 LIN_DATA_COMBINATIONS = test6 #williamsAlleleT7 #T9 #T6 #T8B T8 #T8B T9 #T6 T3 A2 logistic abs_logistic T8 # T5 T3 #B2 T4  T2 #A1 A2 A3 #B1 B2 B3 B4 C1 C2 C3 T1 
-
-
-# Default target
-default: runSim 
-	# GetInitialDistributionData 
-	# make GetPopAFraction 
 
 run:
 	$(foreach var,$(DATA_COMBINATIONS),\
@@ -156,8 +154,6 @@ runForLogCap:
 			ShowIndividualRunStats $(SHOW_INDIV_RUN_STATS);\
 		)
 
-
-# default: GetInitialDistributionData
 # default: GetInitialDistributionData GetInitialPopAFraction runSim
 # default:  GetAgeDistributionData runSim
 # default:  runSim 
