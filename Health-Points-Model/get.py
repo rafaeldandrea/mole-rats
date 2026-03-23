@@ -1,16 +1,17 @@
-from genericpath import isfile
-from math import ceil, log, exp
-from pathlib import Path
-from statistics import mean
-import numpy as np
+# Standard library imports
 from collections import Counter
 import importlib
+from math import ceil, exp, log
+from os.path import isfile
+from pathlib import Path
+from random import choice, choices, random
+from statistics import mean
 
-from random import choices, random, choice
+# Third-party imports
+import numpy as np
 from scipy.stats import genlogistic
 
-from display import write_to_file
-from re import findall
+import display
 
 ### FUNCTIONS ###
 def parse_allele(allele_string, allele_name):
@@ -26,7 +27,6 @@ def parse_allele(allele_string, allele_name):
 
 def create_config_file(file_path):
     '''Creates a file path with input info'''
-    UseTradeoffAllele = True if 'w' in file_path else False
     HP = "900" if not 'HP' in file_path else parse_allele(file_path,'HP')
     hp = "900" if not 'hp' in file_path else parse_allele(file_path,'hp')
     R = "10" if not 'R' in file_path else parse_allele(file_path,'R')
@@ -45,12 +45,12 @@ def create_config_file(file_path):
     for i in range(1,len(components)):
         Path('./'+'/'.join(components[:i])).mkdir(parents=True, exist_ok=True)
 
-    w = open(file_path,'a')
-    header = "import gen as c\n\n### CONFIG VARIABLES ###\n\nCONFIG = dict(c.CONFIG)\n"
-    w.write(header)
-    # components = file_path.split('/')[1:]
-    
-    a = "\nCONFIG['HP'] = " + HP + "						  # the number of heath points that a member of the longer-lived species has at birth\n\
+    try:
+        with open(file_path, 'a') as w:
+            header = "import gen as c\n\n### CONFIG VARIABLES ###\n\nCONFIG = dict(c.CONFIG)\n"
+            w.write(header)
+            
+            a = "\nCONFIG['HP'] = " + HP + "						  # the number of heath points that a member of the longer-lived species has at birth\n\
 CONFIG['hp'] = " + hp + " 						  # the number of heath points that a member of the longer-lived species has at birth\n\
 CONFIG['R'] = " + R + " 							  # The number of ticks between each age based decrease in HP for the longer-lived species\n\
 CONFIG['r'] = " + r + " 							  # The number of ticks between each age based decrease in HP for the shorter-lived species\n\
@@ -62,33 +62,48 @@ CONFIG['TicksTillFertile'] = " + TicksTillFertile + "		 \n\
 CONFIG['insult_recovery_ticks'] = " + insult_recovery_ticks + " 		  # The number of ticks until your insult is healed\n\
 CONFIG['pop_cap_exponent'] = " + pop_cap_exponent + "\n\
 CONFIG['pop_cap_mult'] = " + pop_cap_mult + "\n\
-CONFIG['LogorithmicPopulationCap'] = True 		# Decreases lifespan as population increases, should be used for exponential growth\n\
-CONFIG['UseTradeoffAllele'] = " + str(UseTradeoffAllele) + "\n\n\
+CONFIG['LogorithmicPopulationCap'] = True 		# Decreases lifespan as population increases, should be used for exponential growth\n\n\
 ######## Generated Responses ########\n"
-
-    w.write(a)
-    w.close()
+            w.write(a)
+    except (IOError, OSError) as e:
+        print(f'Error: Failed to create config file {file_path}: {e}')
+        raise
+    except Exception as e:
+        print(f'Unexpected error creating config file {file_path}: {e}')
+        raise
     
 def configuration(run_args):
     ''' Import Configuration '''
 
     # total arguments
     num_args = len(run_args)
-    # CONFIG = dict()
+    # TODO: Standardize file path and name
+    file_name = 'IQ-' + run_args[1] if 'UseImmortalQueenMode' in run_args and run_args.index('UseImmortalQueenMode') + 1 < len(run_args) and 'True' == run_args[run_args.index('UseImmortalQueenMode')+1] else run_args[1]
     if num_args > 1:
-        if not isfile('config_files/' + run_args[1].replace('.', 'pt') + '.py'):
-            create_config_file('config_files/' + run_args[1] + '.py')
+        if not isfile('config_files/' + file_name.replace('.', 'pt') + '.py'):
+            create_config_file('config_files/' + file_name + '.py')
             
-        file_path = 'config_files.' + run_args[1].replace('.', 'pt').replace('/', '.') 
+        file_path = 'config_files.' + file_name.replace('.', 'pt').replace('/', '.') 
         print(file_path)
-        c = importlib.import_module(file_path)
+        try:
+            c = importlib.import_module(file_path)
+        except (ImportError, ModuleNotFoundError) as e:
+            print(f'Error: Failed to import config module {file_path}: {e}')
+            raise
+        except Exception as e:
+            print(f'Unexpected error importing config module {file_path}: {e}')
+            raise
     # else:
     #     file_path = 'config_files/wildLin.py' 
     #     import config_files.wildLin as c
 
-    CONFIG = c.CONFIG
-    CONFIG['file_path'] = 'config_files/' + run_args[1].replace('.', 'pt') + '.py'
-    CONFIG['file_name'] =  run_args[1] 
+    try:
+        CONFIG = c.CONFIG
+    except AttributeError as e:
+        print(f'Error: Config module {file_path} does not have CONFIG attribute: {e}')
+        raise
+    CONFIG['file_path'] = 'config_files/' + file_name.replace('.', 'pt') + '.py'
+    CONFIG['file_name'] =  file_name
 
 
 # ######## Generated Responses ########
@@ -103,9 +118,8 @@ def configuration(run_args):
     CONFIG['LongRun'] = False
     CONFIG['MaxPopulation'] = 10000			  # the maximum allowable population
     CONFIG['MaxTicks'] = 10000                # the maximum number of time ticks the simulation runs for
-    CONFIG['GetPopAFraction'] = False
     CONFIG['GetAgeDistribution'] = False		  # Warning: This will take awhile to run if you don't lower max ticks to at least 2000
-    CONFIG['GetLifespanDistribution'] = True  # For testing, data analyisis and graphing
+    CONFIG['GetLifespanDistribution'] = False  # For testing, data analyisis and graphing
     CONFIG['GetMortality'] = False             # Requires CONFIG['GetIndividualRunData'] = True to work
     CONFIG['GetEquilibriumPopulation'] = False             # Requires CONFIG['GetIndividualRunData'] = True to work
     CONFIG['UseEquilibriumForInitPop'] = True
@@ -120,10 +134,15 @@ def configuration(run_args):
             CONFIG[run_args[i-1]] = True
         elif run_args[i] == 'False':
             CONFIG[run_args[i-1]] = False
-        elif '.' in run_args[i]:
-            CONFIG[run_args[i-1]] = float(run_args[i])
+        elif run_args[i] == 'None':
+            CONFIG[run_args[i-1]] = None
+        elif run_args[i].isnumeric():
+            if '.' in run_args[i]:
+                CONFIG[run_args[i-1]] = float(run_args[i])
+            else:
+                CONFIG[run_args[i-1]] = int(run_args[i])
         else:
-            CONFIG[run_args[i-1]] = int(run_args[i])
+            CONFIG[run_args[i-1]] = str(run_args[i])
         
 
     if CONFIG['LongRun']:
@@ -131,43 +150,51 @@ def configuration(run_args):
         CONFIG['GetLifespanDistribution'] = True  # For testing, data analyisis and graphing
         CONFIG['GetMortality'] = True             # Requires CONFIG['GetIndividualRunData'] = True to work
         CONFIG['GetEquilibriumPopulation'] = True             # Requires CONFIG['GetIndividualRunData'] = True to work
-        CONFIG['GetPopAFraction'] = False           # Would take too long to run on long run
         CONFIG['UseOverallRunStats'] = True		  # For testing, data analyisis and graphing
         CONFIG['GetIndividualRunData'] = True
     elif CONFIG['GetAgeDistribution']:
         CONFIG['GetLifespanDistribution'] = False  # For testing, data analyisis and graphing
         CONFIG['GetIndividualRunData'] = False
         CONFIG['UseOverallRunStats'] = False		  # For testing, data analyisis and graphing
-    elif CONFIG['GetPopAFraction']:
-        CONFIG['GetLifespanDistribution'] = False  # For testing, data analyisis and graphing
-    CONFIG['GetLifespanDistribution'] = True
+
     ### Initialize Global Variables ###
 
     if CONFIG['GetEquilibriumPopulation']:         # Requires CONFIG['GetIndividualRunData'] = True to work
         CONFIG['GetIndividualRunData'] = True
+    
+    # Initialize colony reproduction mode defaults if not set
+    if 'UseColonyReproductionMode' not in CONFIG:
+        CONFIG['UseColonyReproductionMode'] = False
+    if 'N0Colonies' not in CONFIG:
+        CONFIG['N0Colonies'] = 5
+    if 'MatingFlightInterval' not in CONFIG:
+        CONFIG['MatingFlightInterval'] = 10
+    if 'ThresholdColonySize' not in CONFIG:
+        CONFIG['ThresholdColonySize'] = 30
+    if 'MatingFlightSelection' not in CONFIG:
+        CONFIG['MatingFlightSelection'] = 'random'
+    if 'QueenHPMultiplier' not in CONFIG:
+        CONFIG['QueenHPMultiplier'] = 2.0
+    if 'BaseColonyFormationProbability' not in CONFIG:
+        CONFIG['BaseColonyFormationProbability'] = 0.05
+    if 'ColonyLogisticMult' not in CONFIG:
+        CONFIG['ColonyLogisticMult'] = 0.1
+    if 'ColonyLogisticExp' not in CONFIG:
+        CONFIG['ColonyLogisticExp'] = 1.0
         
     # Sets display_factors 
-    CONFIG['display_factors'] = ['Overall'] if CONFIG['UseOverallRunStats'] else []
-
-    if CONFIG['HP'] != CONFIG['hp'] or CONFIG['R'] == CONFIG['r'] or CONFIG['UseTradeoffAllele']:
-        CONFIG['show_hp'] = True
-        CONFIG['display_factors'] += ['hp', 'HP']
-    else:
-        CONFIG['show_hp'] = False
-
-    if CONFIG['R'] != CONFIG['r'] or CONFIG['HP'] == CONFIG['hp'] or CONFIG['UseTradeoffAllele']:
-        CONFIG['show_r'] = True
-        CONFIG['display_factors'] += ['r', 'R']
-    else:
-        CONFIG['show_r'] = False
+    CONFIG['display_factors'] = ['Overall', 'w', 'W'] if CONFIG['UseOverallRunStats'] else ['w', 'W']
 
     print('\nCONFIG["display_factors"] = ', CONFIG['display_factors'])
 
     # Checks that we aren't trying to generate a new Age Distribution and have access to pre-generated distributions for all posible occurrances
     for pop in CONFIG['display_factors']:
         if not CONFIG['GetAgeDistribution'] and not pop in CONFIG['age_distribution']['CDF']:
-            print('Error: No Age Distribution Exists in Configuration, Generating Age Distribution (Warning: Will increase runtime)')
-            CONFIG['GetAgeDistribution'] = True
+            if 'DoNotUseAgeDistEver' not in CONFIG or not CONFIG['DoNotUseAgeDistEver']:
+                print('Error: No Age Distribution Exists in Configuration, Generating Age Distribution (Warning: Will increase runtime)')
+            if not CONFIG['LongRun']:
+                CONFIG['NotUsingAgeDistOrLongRun'] = True
+
 
         
     if CONFIG['GetAgeDistribution']:
@@ -190,13 +217,14 @@ def configuration(run_args):
 
         CONFIG['InitialPopulation'] = 10  # the number of NMRs alive at start
 
-    if CONFIG['GetAgeDistribution']:
+    if CONFIG['GetAgeDistribution'] or ('NotUsingAgeDistOrLongRun' in CONFIG and CONFIG['NotUsingAgeDistOrLongRun'] == True) or CONFIG['DoNotUseAgeDistEver']:
         CONFIG['MaxAge'] =  ceil(CONFIG['HP']) if CONFIG['HP'] > CONFIG['hp'] else ceil(CONFIG['hp'])
     else:
-        CONFIG['MaxAge'] = 500
+        CONFIG['MaxAge'] = 2000
         for pop in CONFIG['display_factors']:
             CONFIG['MaxAge'] = len(CONFIG['age_distribution']['CDF'][pop]) + 100  if CONFIG['MaxAge'] < len(CONFIG['age_distribution']['CDF'][pop]) else ceil(CONFIG['MaxAge'])
-
+    
+    # print("CONFIG['MaxAge']",CONFIG['MaxAge'])
     # Adds comment explaining log cap equation
     if CONFIG['LogorithmicPopulationCap']:
         CONFIG['pop_cap_exponent'] = 1 if not 'pop_cap_exponent' in CONFIG else CONFIG['pop_cap_exponent']
@@ -206,9 +234,10 @@ def configuration(run_args):
             data_setup = "\n\n# insult_severity = insult_severity * np.exp("+str(CONFIG['pop_cap_mult'])+" * population_size**"+ str(CONFIG['pop_cap_exponent'])+'\n'\
                 + "# CONFIG['TicksTillFertile'] = " + str(CONFIG['TicksTillFertile'])
 
-            write_to_file(msg = data_setup,
+            display.write_to_file(msg = data_setup,
                         file_path = CONFIG['file_path'],
-                        msg_type = 'logarithmic cap function')
+                        msg_type = 'logarithmic cap function',
+                        header = '')
 
     print("CONFIG['InitialPopulation']",CONFIG['InitialPopulation'])
             
@@ -216,101 +245,78 @@ def configuration(run_args):
     return CONFIG
 
 
-def random_parent(nmr_pool, tick, CONFIG):
+def random_parent(nmr_pool, tick, CONFIG, parent_sex):
   ''' Chooses a random fertile NMR from input nmr_pool '''
   
   if len(nmr_pool) > 0:
-    possible_parents = choices(nmr_pool)
-    default_parent = possible_parents[0]
+    default_parent = None
+    possible_parents = choices(nmr_pool, k=len(nmr_pool))
+    
+    # Iterates through the randomized list of living NMRs to find the first eledgible parent
+    for candidate in possible_parents:
+        # checks if candidate is old enough and correct gender
+        if candidate.sex == parent_sex:
+            if CONFIG['TicksTillFertile'] <= tick - candidate.birth:
+                return candidate
+            elif default_parent is None or default_parent.birth < candidate.birth:
+                # If no eligible parents are found, return the oldest candidate
+                default_parent = candidate
 
-    while len(possible_parents) > 0 and CONFIG['TicksTillFertile'] >= tick \
-        - possible_parents[0].birth:
-
-  # Iterates through the randomized list of living NMRs to find the first eledgible parent
-
-        possible_parents.pop()
-
-    if len(possible_parents) > 0:
-        return possible_parents[0]
     else:
       # This should only be used in rare instances
+    #   print('Warning: No current eledgible parents found')
       return default_parent
   else:
+    # print('Warning: No possible parents found')
     return 
 
 
+def random_parent_alleles(nmr_pool, tick, CONFIG, parent_sex):
+  ''' Chooses a random fertile NMR from input nmr_pool '''
+  
+  if len(nmr_pool) > 0:
+    possible_parents = choices(nmr_pool, k=len(nmr_pool))
+    
+    # Iterates through the randomized list of living NMRs to find the first eledgible parent
+    for candidate in possible_parents:
+        # checks if candidate is old enough and correct gender
+        if CONFIG['TicksTillFertile'] <= tick - candidate.birth and \
+            candidate.sex == parent_sex:
+            return candidate.w_pops['alleles']
+
+    else:
+    #   print('Warning: No eledgible parents of age found')
+      return None
+  else:
+    # print('Warning: No possible parents found')
+    return None
 
 
 # Initializes Overarching Analytic Variables
 
-def pop_death(run, tick, CONFIG):
+def pop_death(run, tick, CONFIG, colonies=False):
     ''' Checks if a population has died out and updates if it has '''
+    if CONFIG['UseImmortalQueenMode']:
+      return False
+
                 
-    allele_count = Counter(elem.hp_pops['allele_name'] for elem in CONFIG['alive_NMRS']['female']) + \
-                    Counter(elem.r_pops['allele_name'] for elem in CONFIG['alive_NMRS']['female']) + \
-                    Counter(elem.w_pops['allele_name'] for elem in CONFIG['alive_NMRS']['female']) + \
-                    Counter(elem.hp_pops['allele_name'] for elem in CONFIG['alive_NMRS']['male']) + \
-                    Counter(elem.r_pops['allele_name'] for elem in CONFIG['alive_NMRS']['male']) + \
+    allele_count =  Counter(elem.w_pops['allele_name'] for elem in CONFIG['alive_NMRS']['female']) + \
                     Counter(elem.w_pops['allele_name'] for elem in CONFIG['alive_NMRS']['male']) 
 
-    # print('allele_count',allele_count)
 
     num_alive_NMRs = len(CONFIG['alive_NMRS']['female']) + len(CONFIG['alive_NMRS']['male'])
+    # print("allele_count['ww']", allele_count['ww'], "allele_count['WW']", allele_count['WW'])
+    if allele_count['ww'] == num_alive_NMRs or allele_count['WW'] == num_alive_NMRs:
+        if CONFIG['overall_stats']['W']['pop_death_ticks'][run] == CONFIG['overall_stats']['w']['pop_death_ticks'][run]:
+            if allele_count['WW'] == num_alive_NMRs:
+                CONFIG['overall_stats']['w']['pop_death_count'] += 1 
+                CONFIG['overall_stats']['w']['pop_death_ticks'][run] = tick
+            else:
+                CONFIG['overall_stats']['W']['pop_death_count'] += 1 
+                CONFIG['overall_stats']['W']['pop_death_ticks'][run] = tick
 
-    if CONFIG['UseTradeoffAllele']:
-        if allele_count['ww'] == num_alive_NMRs or allele_count['WW'] == num_alive_NMRs:
-            if CONFIG['overall_stats']['HP']['pop_death_ticks'][run] == CONFIG['overall_stats']['hp']['pop_death_ticks'][run]:
-                if allele_count['WW'] == num_alive_NMRs:
-                    CONFIG['overall_stats']['hp']['pop_death_count'] += 1 
-                    CONFIG['overall_stats']['hp']['pop_death_ticks'][run] = tick
-                    CONFIG['overall_stats']['r']['pop_death_count'] += 1 
-                    CONFIG['overall_stats']['r']['pop_death_ticks'][run] = tick
-                else:
-                    CONFIG['overall_stats']['HP']['pop_death_count'] += 1 
-                    CONFIG['overall_stats']['HP']['pop_death_ticks'][run] = tick
-                    CONFIG['overall_stats']['R']['pop_death_count'] += 1 
-                    CONFIG['overall_stats']['R']['pop_death_ticks'][run] = tick
-
-                CONFIG['overall_stats']['pop_death_ticks'][run] = tick
-                return True
-    
-    else:
-        if CONFIG['show_hp'] and (allele_count['hphp'] == num_alive_NMRs or allele_count['HPHP'] == num_alive_NMRs):
-            # checks that both populations still exist
-            if CONFIG['overall_stats']['hp']['pop_death_ticks'][run] == CONFIG['overall_stats']['HP']['pop_death_ticks'][run]:
-
-                if allele_count['HPHP'] == num_alive_NMRs:
-                    CONFIG['overall_stats']['hp']['pop_death_count'] += 1 
-                    CONFIG['overall_stats']['hp']['pop_death_ticks'][run] = tick
-                else:
-                    CONFIG['overall_stats']['HP']['pop_death_count'] += 1 
-                    CONFIG['overall_stats']['HP']['pop_death_ticks'][run] = tick
-
-                
-                if not CONFIG['show_r']:
-                    CONFIG['overall_stats']['pop_death_ticks'][run] = tick
-                    return True    
-                
-        if CONFIG['show_r'] and (allele_count['rr'] == num_alive_NMRs or allele_count['RR'] == num_alive_NMRs):
-
-            # checks that both populations still exist
-            if CONFIG['overall_stats']['r']['pop_death_ticks'][run] == CONFIG['overall_stats']['R']['pop_death_ticks'][run]:
-
-                if allele_count['RR'] == num_alive_NMRs:
-                    CONFIG['overall_stats']['r']['pop_death_count'] += 1
-                    CONFIG['overall_stats']['r']['pop_death_ticks'][run] = tick
-                else:
-                    CONFIG['overall_stats']['R']['pop_death_count'] += 1
-                    CONFIG['overall_stats']['R']['pop_death_ticks'][run] = tick
-                
-                if not CONFIG['show_hp']:
-                    CONFIG['overall_stats']['pop_death_ticks'][run] = tick
-                    return True
-
-        if CONFIG['show_hp'] and CONFIG['show_r']:
-            if CONFIG['overall_stats']['hp']['pop_death_ticks'][run] != CONFIG['overall_stats']['HP']['pop_death_ticks'][run] and CONFIG['overall_stats']['r']['pop_death_ticks'][run] != CONFIG['overall_stats']['R']['pop_death_ticks'][run]:
-                CONFIG['overall_stats']['pop_death_ticks'][run] = tick
-                return True
+            CONFIG['overall_stats']['pop_death_ticks'][run] = tick
+            return True
 
     return False
 
@@ -340,24 +346,40 @@ def distribution_data( data_name, title, CONFIG):
 
         if data_name == 'equilibrium_lifespan_distribution' or data_name == 'lifespan_distribution':
             # Save change_per_x_unit Data
-            distributions['change_per_x_unit'][pop_name] = [CONFIG['overall_stats'][pop_name][data_name][i] / sum(CONFIG['overall_stats'][pop_name][data_name][i:]) for i in range(len(CONFIG['overall_stats'][pop_name][data_name]))]
+            try:
+                distributions['change_per_x_unit'][pop_name] = [CONFIG['overall_stats'][pop_name][data_name][i] / sum(CONFIG['overall_stats'][pop_name][data_name][i:]) if sum(CONFIG['overall_stats'][pop_name][data_name][i:]) > 0 else 0 for i in range(len(CONFIG['overall_stats'][pop_name][data_name]))]
+            except (ZeroDivisionError, IndexError) as e:
+                print(f'Warning: Error calculating change_per_x_unit for {pop_name}: {e}')
+                distributions['change_per_x_unit'][pop_name] = []
 
             # Save Hazard Function # To calculate it, we need to take -d log(S(t)) /dt, where S(t) is the number of individuals surviving at age t
-            distributions['hazard'][pop_name] = [(log(sum(CONFIG['overall_stats'][pop_name][data_name][i:])) - log(sum(CONFIG['overall_stats'][pop_name][data_name][i+1:]))) / 1 for i in range(len(CONFIG['overall_stats'][pop_name][data_name]) - 1)]
+            try:
+                distributions['hazard'][pop_name] = [(log(sum(CONFIG['overall_stats'][pop_name][data_name][i:])) - log(sum(CONFIG['overall_stats'][pop_name][data_name][i+1:]))) / 1 if sum(CONFIG['overall_stats'][pop_name][data_name][i:]) > 0 and sum(CONFIG['overall_stats'][pop_name][data_name][i+1:]) > 0 else 0 for i in range(len(CONFIG['overall_stats'][pop_name][data_name]) - 1)]
+            except (ValueError, IndexError) as e:
+                print(f'Warning: Error calculating hazard function for {pop_name}: {e}')
+                distributions['hazard'][pop_name] = []
 
         # Save PDF Data
-        distributions['PDF'][pop_name] = [i / total_nmrs for i in CONFIG['overall_stats'][pop_name][data_name]]
+        try:
+            distributions['PDF'][pop_name] = [i / total_nmrs for i in CONFIG['overall_stats'][pop_name][data_name]]
+        except ZeroDivisionError:
+            print(f'Warning: total_nmrs is zero for {pop_name}, cannot calculate PDF')
+            distributions['PDF'][pop_name] = []
 
         # Save CDF Data
-        distributions['CDF'][pop_name] =  list(np.cumsum(distributions['PDF'][pop_name], dtype=float))
-        distributions['CDF'][pop_name] = [float(i) for i in distributions['CDF'][pop_name]] # Stupid bit of code to fix numpy update bug
+        try:
+            distributions['CDF'][pop_name] =  list(np.cumsum(distributions['PDF'][pop_name], dtype=float))
+            distributions['CDF'][pop_name] = [float(i) for i in distributions['CDF'][pop_name]] # Stupid bit of code to fix numpy update bug
+        except (ValueError, IndexError) as e:
+            print(f'Warning: Error calculating CDF for {pop_name}: {e}')
+            distributions['CDF'][pop_name] = []
 
     else:
         print('Error: there were no recorded instances of', title, 'data for the population', pop_name)
 
   return distributions
 
-def insult_severity(CONFIG, nmr=False, tick=False, after_pop_death = False, equilibrium_population_sizes = False):
+def insult_severity(CONFIG, colony_population_size, nmr=False, tick=False, after_pop_death = False, equilibrium_population_sizes = False):
     ''' Assigns Severity of insults using insult distribution set by config file'''
 
     if CONFIG['InsultDistribution'] == 'random':
@@ -410,23 +432,24 @@ def insult_severity(CONFIG, nmr=False, tick=False, after_pop_death = False, equi
         rand = random()*50 #1000 (1/x^2)  , sampling from [1:50]
         insult_severity = 1000 / (rand**2)
     elif CONFIG['InsultDistribution'] == 'T7': 
+        # print('T7')
         rand = random()*50000 
         insult_severity = 1000 / (rand**2)
     elif CONFIG['InsultDistribution'] == 'T8':
-        init_hp = CONFIG[nmr.hp_pops['type_name']] + .1 # This is the biggest liberty I took, obviously dividing by log 1 is an issue but init_hp = either 1000 or 1200, I figured that .1 didn't make much difference there
+        init_hp = CONFIG[nmr.hp_type_name] + .1 # This is the biggest liberty I took, obviously dividing by log 1 is an issue but init_hp = either 1000 or 1200, I figured that .1 didn't make much difference there
         rand = random() # just a random number from 0 to 1
         alpha = .01 #The population size was too low with .1
         age = abs(nmr.birth - tick) + 1
-        beta = -(log(nmr.hp_pops['value']/init_hp)) / age # where I have assumed that health_points(t) = init_hp * exp(-beta t), which defines the parameter beta;
+        beta = -(log(nmr.current_health_points/init_hp)) / age # where I have assumed that health_points(t) = init_hp * exp(-beta t), which defines the parameter beta;
         dt = 1 # you do an insult every dt in time, defining the parameter dt: An insult is applied every tick
         insult_severity = (init_hp * alpha * (exp(beta * dt) - 1)) / (beta * log(1/rand))  
         # So, alpha is arbitrary, but beta and dt are determined by the other parameters of your simulation, and the correct values need to be used otherwise it won't work.
     elif CONFIG['InsultDistribution'] == 'T8B':
-        init_hp = CONFIG[nmr.hp_pops['type_name']] + .1 # This is the biggest liberty I took, obviously dividing by log 1 is an issue but init_hp = either 1000 or 1200, I figured that .1 didn't make much difference there
+        init_hp = CONFIG[nmr.hp_type_name] + .1 # This is the biggest liberty I took, obviously dividing by log 1 is an issue but init_hp = either 1000 or 1200, I figured that .1 didn't make much difference there
         rand = random() # just a random number from 0 to 1
         alpha = .01 #The population size was too low with .1
         age = abs(nmr.birth - tick) + 1
-        beta =  -log(2) / nmr.r_pops['value'] # where I have assumed that health_points(t) = init_hp * exp(-beta t), which defines the parameter beta;
+        beta =  -log(2) / nmr.r_value_current # where I have assumed that health_points(t) = init_hp * exp(-beta t), which defines the parameter beta;
         insult_severity = (init_hp * alpha * (exp(beta ) - 1)) / (beta * log(1/rand))  
     elif CONFIG['InsultDistribution'] == 'T9': 
         rand = random()*50 
@@ -436,13 +459,36 @@ def insult_severity(CONFIG, nmr=False, tick=False, after_pop_death = False, equi
 
     if CONFIG['LogorithmicPopulationCap']:
         if CONFIG['UseAvgForLogCap']:
-          population_size = mean(CONFIG['last_3_pop_sizes'])
+          pop_size = mean(CONFIG['last_3_pop_sizes'])
         else:
-          population_size = len(CONFIG['alive_NMRS']['female']) + len(CONFIG['alive_NMRS']['male']) if not after_pop_death else CONFIG['InitialPopulation']
-          insult_severity = insult_severity * np.exp(CONFIG['pop_cap_mult'] * (population_size**CONFIG['pop_cap_exponent']))
+          pop_size = colony_population_size if not after_pop_death and not colony_population_size == None else CONFIG['InitialPopulation']
+          insult_severity = insult_severity * np.exp(CONFIG['pop_cap_mult'] * (pop_size**CONFIG['pop_cap_exponent']))
 
     if not 'insults' in CONFIG:
         CONFIG['insults'] = []
     CONFIG['insults'].append(insult_severity)  
       
     return insult_severity
+
+def get_run_mode(CONFIG):
+  ''' Returns the mode of the run as a string '''
+  if not CONFIG['UseColonyReproductionMode']:
+    mode = 'Individual'
+  elif CONFIG['MatesWithinColony']:
+    mode = 'Mole Rat'
+  else:
+    mode = 'Ant'
+  return mode
+
+def get_longevity_allele(CONFIG):
+    ''' Returns the longevity allele as a string '''
+    longevity = 'W' if CONFIG['R'] > CONFIG['r'] else 'w'
+    return longevity
+
+def get_longevity_or_vitality_allele(CONFIG, allele_name):
+    ''' Returns the longevity or vitality allele as a string '''
+    longevity = 'W' if CONFIG['R'] > CONFIG['r'] else 'w'
+    if allele_name == longevity:
+        return 'Longevity'
+    else:
+        return 'Vitality'
