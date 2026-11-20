@@ -19,7 +19,7 @@ A  simulation of population dynamics, modeling allele competition between longev
 
 ## Requirements
 
-- **Python 3.x** (3.9+ recommended)
+- **Python 3.x** (3.12+ recommended)
 - **NumPy**
 - **SciPy**
 - **Matplotlib**
@@ -42,7 +42,7 @@ A  simulation of population dynamics, modeling allele competition between longev
 3. Install dependencies:
 
    ```bash
-   pip install numpy scipy matplotlib pandas
+   pip install -r requirements.txt
    ```
 
 4. Create required directories (they will be auto-created if missing, but you may need them for output):
